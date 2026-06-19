@@ -27,4 +27,16 @@ urlpatterns = [
         "orders/",
         include("orders.urls"),
     ),
+
+    path(
+    "stores/",
+    include("stores.urls")
+    ),
+
+    path(
+    "api/search/",
+    include("search.urls")
+    ),
+
+
 ]

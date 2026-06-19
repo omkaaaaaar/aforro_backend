@@ -11,8 +11,11 @@ from .models import Order, OrderItem
 from .serializers import (
     CreateOrderSerializer,
     OrderSerializer,
+    StoreOrderListSerializer,
 )
 from drf_spectacular.utils import extend_schema
+
+from django.db.models import Count
 
 
 @extend_schema(
@@ -131,3 +134,24 @@ class CreateOrderAPIView(APIView):
             OrderSerializer(order).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class StoreOrdersAPIView(APIView):
+
+    def get(self, request, store_id):
+
+        orders = (
+            Order.objects
+            .filter(store_id=store_id)
+            .annotate(
+                total_items=Count("items")
+            )
+            .order_by("-created_at")
+        )
+
+        serializer = StoreOrderListSerializer(
+            orders,
+            many=True
+        )
+
+        return Response(serializer.data)

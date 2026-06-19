@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Order, OrderItem
+from rest_framework import serializers
 
 
 #Order Item Serializer
@@ -59,3 +60,18 @@ class CreateOrderSerializer(
         many=True,
         allow_empty=False
     )
+
+class StoreOrderListSerializer(serializers.ModelSerializer):
+
+    total_items = serializers.IntegerField(
+        read_only=True
+    )
+
+    class Meta:
+        model = Order
+        fields = [
+            "id",
+            "status",
+            "created_at",
+            "total_items",
+        ]
