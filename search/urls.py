@@ -1,7 +1,8 @@
 from django.urls import path
 
 from .views import (
-    ProductSearchAPIView
+    ProductSearchAPIView,
+    ProductSuggestAPIView,
 )
 
 urlpatterns = [
@@ -12,4 +13,9 @@ urlpatterns = [
         name="product-search",
     ),
 
+    path(
+        "suggest/",
+        ProductSuggestAPIView.as_view(),
+        name="product-suggest",
+    ),
 ]

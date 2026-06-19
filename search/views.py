@@ -13,6 +13,12 @@ from products.models import Product
 
 from .serializers import ProductSearchSerializer
 
+from django.db.models import Case, When, IntegerField
+
+from .throttles import (
+    SuggestRateThrottle
+)
+
 
 @extend_schema(
     summary="Search Products",
@@ -156,4 +162,72 @@ class ProductSearchAPIView(APIView):
 
         return paginator.get_paginated_response(
             serializer.data
+        )
+
+
+@extend_schema(
+    summary="Product Suggestions",
+    description=(
+        "Autocomplete suggestions. "
+        "Rate limited to 20 requests per minute."
+    ),
+    parameters=[
+        OpenApiParameter(
+            name="q",
+            type=str,
+            description="Minimum 3 characters"
+        )
+    ]
+)
+
+class ProductSuggestAPIView(APIView):
+
+    throttle_classes = [
+        SuggestRateThrottle
+    ]
+
+    def get(self, request):
+
+        query = request.GET.get(
+            "q",
+            ""
+        ).strip()
+
+        if len(query) < 3:
+
+            return Response(
+                {
+                    "error":
+                    "Minimum 3 characters required"
+                },
+                status=400
+            )
+
+        suggestions = (
+            Product.objects
+            .filter(
+                title__icontains=query
+            )
+            .annotate(
+                priority=Case(
+                    When(
+                        title__istartswith=query,
+                        then=0
+                    ),
+                    default=1,
+                    output_field=IntegerField()
+                )
+            )
+            .order_by(
+                "priority",
+                "title"
+            )
+            .values_list(
+                "title",
+                flat=True
+            )[:10]
+        )
+
+        return Response(
+            list(suggestions)
         )
