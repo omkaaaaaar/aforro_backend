@@ -4,6 +4,7 @@ from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
 )
+from django.urls import path, include
 
 urlpatterns = [
     path("admin/", admin.site.urls),
@@ -20,5 +21,10 @@ urlpatterns = [
             url_name="schema"
         ),
         name="swagger-ui",
+    ),
+
+    path(
+        "orders/",
+        include("orders.urls"),
     ),
 ]
