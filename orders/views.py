@@ -17,6 +17,9 @@ from drf_spectacular.utils import extend_schema
 
 from django.db.models import Count
 
+from .tasks import (
+    order_confirmation_task
+)
 
 @extend_schema(
     request=CreateOrderSerializer,
@@ -110,6 +113,10 @@ class CreateOrderAPIView(APIView):
         order = Order.objects.create(
             store=store,
             status=Order.Status.CONFIRMED,
+        )
+
+        order_confirmation_task.delay(
+            order.id
         )
 
         for item in data["items"]:

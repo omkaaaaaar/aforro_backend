@@ -38,5 +38,4 @@ urlpatterns = [
     include("search.urls")
     ),
 
-
 ]
