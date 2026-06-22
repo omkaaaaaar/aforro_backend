@@ -898,3 +898,197 @@ My APIs used Django ORM with optimized QuerySets. To avoid N+1 query problems, I
 5. When would you use _prefetch_related_?
 6. For _Order -> Store_, which one would you use and why?
 7. For _Order -> OrderItems_, which one would you use and why?
+
+---
+
+# Topic 3: Database Design Basics
+
+This topic is extremely important because it covers the models and then database around them
+Since we have already built:
+Category
+Product
+Store
+Inventory
+Order
+OrderItem
+This is a good position cause every database concept can be explained using this project
+
+## 1. What are Tables, Rows, and Columns?
+
+Think of a database like an Excel workbook
+
+### Table
+
+A table stores data about one type of thing
+Ex:
+
+```
+Product Table
+| id | title       | price |
+| -- | ----------- | ----- |
+| 1  | iPhone      | 70000 |
+| 2  | Samsung S24 | 65000 |
+
+```
+
+The whole structure is a table
+
+### Row
+
+A row is one record
+Ex:
+
+```
+id=1
+title=iPhone
+price=70000
+```
+
+This is one row
+
+### Column
+
+A column is one attribute
+Ex:
+
+```
+title
+price
+category_id
+```
+
+Each column stores one type of information
+
+**In this project:**
+Tables:
+
+```
+Category
+Product
+Store
+Inventory
+Order
+OrderItem
+```
+
+Each Django model becomes one database table
+
+#### What is the difference between a table, row and column?
+
+A table stores data for a specific entity, such as Product. A row represents a single record in that table, and a column represents an attribute of that record, such as title or price.
+
+## 2. Primary Key
+
+A primary key uniquely identifies each row
+Ex:
+Product
+
+```
+| id | title   |
+| -- | ------- |
+| 1  | iPhone  |
+| 2  | Samsung |
+```
+
+Here:
+**id**
+is the primary key
+No two rows can have the same primary key
+
+**Django Example**
+
+```
+class Product(models.Model):
+    title = models.CharField(...)
+```
+
+Django automatically creates:
+
+```
+id = AutoField(primary_key=True)
+```
+
+unless you specify you own
+
+_Why Primary Keys are important?_
+Imagine finding:
+Product #3
+Without a unique identifier, Django wouldn't know which row to update or delete.
+
+#### What is a primary key?
+
+A primary key is a column that uniquely identifies each row in a table. Django automatically creates an id field as the primpary key unless we define one ourselves.
+
+## 3. Foreign Key
+
+A foreign key creates a relationship between tables.
+
+Ex:
+Products belongs to a Category
+
+```
+class Product(models.Model):
+    category = models.ForeignKey(Category)
+```
+
+Database
+_Category_
+
+```
+| id | name   |
+| -- | ------ |
+| 1  | Phones |
+```
+
+_Product_
+
+```
+| id | title  | category_id |
+| -- | ------ | ----------- |
+| 1  | iPhone | 1           |
+```
+
+The Value: category_id = 1
+points to: Category(id=1)
+
+**Why Use Foreign Keys?**
+Avoids duplicate data
+
+Bad:
+iPhone | Phones
+Samsung | Phones
+Pixel | Phones
+Category repeated many times
+
+Better:
+Category Table
+stores "Phone" once.
+
+**In this project**
+Product -> Category
+Inventory -> Product
+Inventory -> Store
+Order -> Store
+OrderItem -> Order
+OrderItem -> Product
+All are foreign key relationships
+
+#### What is a foreign key?
+
+A foreign key is a column that references the primary key of another table and creates a relationship between the two tables.
+
+## 4. unique_together
+
+This is directly from the project
+
+Problem
+Suppose Inventory table contains:
+
+```
+| store | product | quantity |
+| ----- | ------- | -------- |
+| 1     | 5       | 10       |
+| 1     | 5       | 15       |
+```
+
+Same product and store twice
