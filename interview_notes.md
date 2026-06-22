@@ -579,10 +579,11 @@ Without optimization/optimizing this: Huge number of queries
 
 The N+1 query problem occurs when one query fethces a list of objects and then additional queries are executed for each object to retrieve related data. This results in many unnecessary database queries and poor performance
 
-## 4. select_related() --
+## 4. select_related() --Doubt (watch a yt vid)
 
+It performs an **INNER JOIN** or **LEFT OUTER JOIN**
 Used for:
-**ForeignKey**
+**ForeignKey**: A Foreign Key is a column in one table that references the Primary key of the another table, creating a relationship between two tables
 or
 **OneToOne**
 relationships.
@@ -684,7 +685,7 @@ Order.objects.select_related(
 
 We use select_related for ForeignKey and OneToOne relationships when we know we will access related objects. It performs a SQL JOIN and prevents N+1 query issues.
 
-## 5. prefetch_related()
+## 5. prefetch_related() --Doubt (watch a yt vid)
 
 Used for:
 **Reverse ForeignKey**
@@ -866,10 +867,34 @@ in one optimized query.
 ## Interview Questions
 
 1. What is Django ORM?
+   Django ORM allows developers to interact with the database tables using Python objects instead of writing SQL manually.
+
 2. What is a QuerySet?
+   A QuerySet is a collection of database returned by Django ORM. It is lazily evaluated and executes SQL only when data is needed
+
 3. Explain the N+1 query problem.
+   N+1 occurs when one query retrieves a list of objects and then additional queries are executed for each object to fetch related data. This creates unnecessary database load and slows down the application
+
 4. What is select_related?
+   select_related performs SQL JOINs and is used for ForeignKey and OneToOne relationships to reduce database queries
+
 5. What is prefetch_related?
+   prefetch_related is used for reverse ForeignKey and ManyToMany relationships.
+   Django executes seperate queries and combines the results efficiently
+
 6. How did you optimize queries in your project?
+   I used select_related on inventory and order queries to fetch related Product Category, and Store data in a single query. For collections such as OrderItems, I used prefetch_related to avoid N+1 query and impre improve performance.
 
 #### Tell me howyou optimized database performance in your progress.
+
+My APIs used Django ORM with optimized QuerySets. To avoid N+1 query problems, I used select_related for ForeignKey relationships such as Inventory -> Product and Product -> Category, and prefetch_related for collections like Order -> OrderItems. This reduced unnecessary database queries and improved response times.
+
+##### Quick Drill
+
+1. Why is ORM better than writing raw SQL everywhere?
+2. What does "QuerySets are lazy" mean?
+3. What causes an N+1 query problem?
+4. When would you use _select_related_?
+5. When would you use _prefetch_related_?
+6. For _Order -> Store_, which one would you use and why?
+7. For _Order -> OrderItems_, which one would you use and why?
