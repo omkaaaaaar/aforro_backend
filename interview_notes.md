@@ -1092,3 +1092,297 @@ Suppose Inventory table contains:
 ```
 
 Same product and store twice
+Now:
+Actual Inventory?
+10 or 15
+Cofusing.
+
+**Solution**
+Only allows one inventory row per:
+(store, product)
+pair.
+
+Django:
+
+```
+class Meta:
+    unique_together = (
+        "store",
+        "product"
+    )
+```
+
+Now after using this above query,
+This gets invalid
+_Store 1_
+_Product 5_
+appearing twice.
+
+#### Why did you use unique_together in Inventory?
+
+Each store should have only one inventory record for a product. The unique constraint on store and product prevents duplicate inventory rows and maintains data consistency.
+
+## 5. Indexing
+
+Imagine:
+1 million products
+You search:
+
+```
+Product.objects.get(id=999999)
+```
+
+Without index:
+Check row 1
+Check row 2
+Check row 3
+...
+Very Slow
+
+**Index = Book Index**
+Instead of reading entire book:
+"Django" → Page 125
+Jumps directly
+
+Database indexes work similarly
+
+Example:
+
+```
+title = models.CharField(
+    max_length=255,
+    db_index=True
+)
+```
+
+Now searches on title become faster
+
+**Tradeoff**
+Indexes improve:
+
+```
+SELECT
+```
+
+speed.
+But slightly slow down:
+
+```
+INSERT
+UPDATE
+DELETE
+```
+
+because index must be maintained
+
+In this project
+Good candidates for indexes are:
+Product.title
+Product.category
+Inventory.store
+Inventory.product
+Order.store
+created_at
+because they're frequently filtered
+
+#### What is an Index?
+
+An index is a database structure that helps locate rows faster. It improves read performance but adds some overhead to writes because the index must also be updated.
+
+## 6. Normalization
+
+Normalization means
+Avoid duplicate data
+Organize tables properly
+
+Bad design:
+
+```
+| product | category |
+| ------- | -------- |
+| iPhone  | Phones   |
+| Samsung | Phones   |
+| Pixel   | Phones   |
+```
+
+Category repeated many times
+
+Better:
+
+```
+Category
+| id | name   |
+| -- | ------ |
+| 1  | Phones |
+
+Product
+| id | title  | category_id |
+| -- | ------ | ----------- |
+| 1  | iPhone | 1           |
+```
+
+Benefits:
+
+- Less duplication
+- Smaller storage
+- Easier updates
+- Better consistency
+
+In this project
+Category separate
+Product separate
+Store separate
+Inventory separate
+Orders separate
+
+#### What is normalization?
+
+Normalization is the process of organizing database tables to reduce redundancy and improve data consistency. Related information is stored in seperate tables and connected through keys.
+
+## 7. Relationships
+
+1. One-to-One
+   One record maps to one record.
+   Ex:
+   User <-> Profile
+   One profile per user
+   Django:
+   _OneToOneField_
+
+2. One-to-Many
+   Most common
+   Ex:
+   Category -> Many products
+   One Category. Many products
+   In this project:
+   Category -> Product
+   Store -> Inventory
+   Store -> Order
+   Order -> OrderItem
+   All are one-to-many
+   Django:
+   _ForeignKey_
+
+3. Many-to-Many
+   Ex:
+   Student <-> Course
+   One student can join many courses
+   One course can have many students
+   Django:
+   _ManyToManyField_
+
+#### Difference between one-to-many and many-to-many?
+
+In one-to-many, one record can have many related records, but each related record belongs to only one parent. In many-to-many, both sides can have multiple related records.
+
+## 8. How Do the Models Relate?
+
+Complete model relationship diagram:
+
+```
+Category
+    |
+    |
+    v
+ Product
+    |
+    |
+    v
+ Inventory
+ ^        ^
+ |        |
+ |        |
+Store     |
+          |
+          |
+Order ----|
+   |
+   |
+   v
+OrderItem
+   |
+   |
+   v
+Product
+```
+
+Lets describe each relationship.
+
+1. Category -> Product
+   One Category
+   Many Products
+   Ex:
+   Phones
+   ├─ iPhone
+   ├─ Samsung
+   └─ Pixel
+
+2. Store -> Inventory
+   One Store
+   Many Inventory Rows
+   Ex:
+   Mumbai Store
+   ├─ iPhone: 10
+   ├─ Pixel: 5
+   └─ Samsung: 7
+
+3. Product -> Inventory
+   One Product
+   Many Inventory Rows
+   because same product exists in many stores
+
+4. Store -> Order
+   One Store
+   Many Orders
+
+5. Order -> OrderItem
+   One Order
+   Many OrderItems
+   Ex:
+   Order #101
+   ├─ iPhone x2
+   ├─ Charger x1
+
+6. Product -> OrderItem
+   One Product
+   Many OrderItems
+
+#### Explain the database design.
+
+I designed seperated tables for Category, Product, Store, Inventory, Order, and OrderItem. Products belong to categories, inventory links products and stores, order belongs to stores, and order items connect products to orders. I used foreign keys to model one-to-many relationships and a unique consttraint on inventory to ensure only one inventory record exists per store-product pair.
+
+## Imp Questions from Topic 3
+
+1. What is a primary key?
+   A unique identifier for each row in a table
+
+2. What is a foreign key?
+   A column that references other table's primary key and creates relationships
+
+3. Why did you use unique_together?
+   To ensure only one inventory record exists for each store-product combination
+
+4. What is an index?
+   A structure that speeds up database lookups and filtering
+
+5. What is normalization?
+   Organizing tables to reduce duplicate data and improve consistency
+
+6. Explain relationships in your project.
+   Category -> Product, Store -> Inventory, Product -> Inventory, Store -> Order, Order -> OrderItem, Product -> OrderItem
+
+### Explain your database schema
+
+My application has six main tables: Category, Product, Store, Inventory, Order, and OrderItem. Products belong to categories. Inventory acts as a bridge between stores and products and tracks stock quantity. Orders belong to stores, and OrderItems store the product inside each order. I used foreign keys for relationships and a unique constraint on Inventory to ensure one inventory record per store-product pair. The schema is normalized to avoid duplicare data and maintain consistency.
+
+#### Quick Drill
+
+1. Why do we need a primary key?
+2. What problem does a foreign key solve?
+3. WHy is _(store, product)_ unique in inventory?
+4. What is benifit of indexing?
+5. What is normalization?
+6. Is _Category -> Product_ one-to-many or many-to-many?
+7. Why did you create an _OrderItem_ table instead of storing products directly inside Order?
+
+---
