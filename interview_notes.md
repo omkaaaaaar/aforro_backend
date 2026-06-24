@@ -1,3 +1,5 @@
+# DAY 1
+
 # Topic 1: Django project structure and MVT pattern
 
 ## 1. What is MVT?
@@ -1632,3 +1634,675 @@ I built a Django REST API for inventory and order management. The project is div
 9. What is the difference between _makemigrations_ and _migrate_?
 
 10. Why should migration files be committed to Git?
+
+---
+
+---
+
+# DAY 2
+
+---
+
+# Topic 1: HTTP Methods & Status Codes
+
+APIs are fundamentally built on HTTP.
+
+Interviewrs often start with:
+"Tell me what happens when someone calls your POST /orders endpoint."
+To answer that well, you need to understand HTTP methods and status codes.
+
+## 1. What is HTTP?
+
+HTTP(HyperText Transfer Protocol) is the language that clients and servers use to communicate.
+Ex:
+
+```
+Frontend
+   ↓
+POST /orders/
+   ↓
+Django API
+   ↓
+Response
+```
+
+Every API request contains:
+_Method_
+_URL_
+_Headers_
+_Body (optional)_
+
+Ex:
+
+```
+POST /orders/
+Content-Type: application/json
+
+{
+   "store_id": 1,
+   "items": [...]
+}
+```
+
+## 2. Types of Request
+
+1. **GET**
+   Used to: _Retrieve data_
+   Should not change anything in the database.
+   Ex: _GET /stores/1/orders/_
+
+2. **POST**
+   Used to: _Create a new resource_
+   Ex: _POST /orders/_
+   Request:
+   {
+   "store_id": 1,
+   "items": [...]
+   }
+   Creates:
+   Order
+   OrderItems
+   Inventory changes
+   Database state changes, So POST is appropriate.
+   Q. Whys is order creation a POST request?
+   Because a new order is being created and database state changes. POST is used for resoure creation.
+
+3. **PUT**
+   Used to: _Replace an entire resource_
+   Suppose product:
+   {
+   "title": "iPhone",
+   "price": 70000
+   }
+   PUT:
+   _PUT /products/1_
+   Body:
+   {
+   "title": "iphone 15",
+   "price": 80000
+   }
+   Entire object gets replaced.
+
+4. **PATCH**
+   Used to: _Update only specific fields_
+   Ex:
+   _PATCH /products/1/_
+   Body:
+   {
+   "price": 80000
+   }
+   Only price changes.
+   Everything else remains unchanged.
+
+5. **DELETE**
+   Used to:_Remove a resource_
+   Ex:
+   _DELETE /products/1/_
+   Product removed.
+
+**Requests used in this Project**
+
+1. GET
+   Used for:
+   GET /stores/<store_id>/orders/
+   GET /stores/<store_id>/inventory/
+   GET /api/search/products/
+   GET /api/search/suggest/
+   Because they only retrieve data
+
+2. POST
+   Used for:
+   POST /orders/
+   Because it creates an order.
+
+## 3. What is Idempotency
+
+An operation is idempotent if performing it multiple times produce the same final result.
+
+Ex:
+**DELETE**
+Delete product:
+_DELETE /product/1/_
+Run once:
+_Product deleted_
+Run again:
+_Still deleted_
+Final state unchanged
+Idempotent.
+
+**PUT**
+_PUT /products/1/_
+{
+"price": 100
+}
+Run 10 times:
+Final result:
+_Price = 100_
+Same outcome.
+Idempotent.
+
+**POST**
+_POST /orders/_
+Run Twice:
+_Order #101_
+_Order #102_
+Two orders created.
+Not idempotent.
+
+**Which Methods Are Idempotent**
+
+```
+| Method | Idempotent?           |
+| ------ | --------------------- |
+| GET    | Yes                   |
+| PUT    | Yes                   |
+| PATCH  | Usually treated as No |
+| DELETE | Yes                   |
+| POST   | No                    |
+
+```
+
+#### Why Post is not idempotent?
+
+Because sending the same POST request multiple times can create multiple resources and produce different results.
+
+## 4. What are Safe Methods?
+
+Safe Method: Do not modify server data.
+
+Safe:
+GET
+HEAD
+OPTIONS
+
+Not safe:
+POST
+PUT
+PATCH
+DELETE
+Because they change data.
+
+#### What is different between safe and idempotent?
+
+Safe methods do not modify data,. Idempotent methods may modify data, but repeated requests result in the same final state.
+Ex: DELETE, is idempotent but not safe.
+
+## 5. Important Status Codes
+
+1. **200 OK**
+   Request succeeded.
+   Ex:
+   _GET /stores/1/orders_
+   returns:
+   _200 Ok_
+
+2. **201 Created**
+   New resource successfully created
+   Ex:
+   _POST /orders/_
+   Order created successfully
+   Return:
+   _201 Created_
+
+3. **400 Bad Request**
+   Client sent invalid data.
+   Ex:
+   {
+   "store*id": null
+   }
+   Return:
+   \_400 Bad Request*
+
+4. **404 Not Found**
+   Request resource doesn't exist
+   Ex:
+   _GET /stores/9999/orders_
+   Store doesn't exist.
+   Return:
+   _404 Not Found_
+
+5. **422 Unprocessable Entity**
+   Request format is valid.
+   But business rule fails.
+   Ex:
+   {
+   "store_id": 1,
+   "items": [
+   {
+   "product_id": 1,
+   "quantity_request": 999
+   }
+   ]
+   }
+   JSON is valid.
+   But inventory insufficient
+   Business logic rejects order.
+   Return:
+   422 Unprocessable Entity
+
+6. **500 Internal Server Error**
+   Server crashed
+   Ex:
+   _Database down_
+   _Unexpected exception_
+   _Bug in code_
+   Return:
+   _500 Internal Server Error_
+
+#### What would you return for a rejected order?
+
+There are two possible designs. If rejected orders are still stored as Order records, I would return 201 Created with status=REJECTED because the resource was created successfully. If no order record is created and the request fails business validation, I would return 422 Unprocessable Entity.
+
+1. Difference between GET and POST?
+   GET retrieve data. POST creates resources and changes the server state
+
+2. What is idempotency?
+   An idempotent operation produces the final result even if it is executed multiple times.
+
+3. Which HTTP methods are idempotent?
+   GET, PUT, and DELETE are idempotent. POST is not.
+
+4. What is a safe method?
+   A safe method does not modify server data. GET is the most common safe method.
+
+5. What status code should successful order creation return?
+   201 Created
+
+6. What status code should inventory storage return?
+   Either 422 if the order is rejected before creation, or 201 if a rejected order resource is still created and stored.
+
+#### Quick drill
+
+- Why is GET /api/search/products/ a GET and not a POST?
+- Why is POST not idempotent?
+- What's the difference between 400 and 422?
+- If a store doesn't exist, what status code should be returned?
+- If an order is successfully created, what status code should be returned?
+- What is the difference between safe and idempotent methods?
+- Why might a team choose to return 201 for a rejected order?
+
+---
+
+# Topic 2: DRF Serializers & Views
+
+This entire project is built using Django REST Framework(DRF).
+
+A common interview sequence is:
+"How does a request reach your API?"
+"Where is validation performed?"
+"What does a serializer do?"
+"Why did you choose APIView"
+
+## 1. What is Serializer?
+
+A Serializer is DRF's way of:
+
+1. Converting Python/Django objects -> JSON
+2. Validating incoming JSON -> Python Objects
+
+**Ex 1: Serialization**
+Database object:
+
+```
+#Python
+product = Product(
+   id=1,
+   title="iPhone",
+   price=70000
+)
+```
+
+Serializer converts it into:
+
+```
+#JSON
+{
+   "id": 1,
+   "title": "iPhone",
+   "price": 70000
+}
+This is what the frontednd recieves.
+```
+
+**Ex 2: Deserialization**
+Incoming request:
+
+```
+#json
+{
+   "store_id": 1,
+   "items": [
+      {
+         "product_id": 5,
+         "quantity_requested": 2
+      }
+   ]
+}
+```
+
+Serializer
+
+- Validates fields
+- Checks required fields
+- Converts data into Python objects
+
+In this Projext
+For:
+_POST /orders/_
+Flow:
+
+```
+Request JSON
+      ↓
+OrderSerializer
+      ↓
+Validation
+      ↓
+Create Order
+      ↓
+Response JSON
+```
+
+#### Why do we need serializer?
+
+Serializers convert Django model instances into JSON response and validate incoming request data before creating or updating records.
+
+## 2. How DRF Validation Works
+
+Suppose request:
+{
+"store_id": null
+}
+Serialzer:
+
+```
+serializer = OrderSerializer(data=request.data)
+serializer.is_valid()
+```
+
+Validation runs.
+
+If Invalid:
+
+```
+{
+   "store_id":[
+      "This field is required."
+   ]
+}
+```
+
+Return:
+_400 Bad request_
+
+**Validation Layers**
+
+1. Field Validation
+   Ex:
+   _quantity_requested = serializers.IntegerField(min_value=1)_
+   Rejects:
+   {
+   "quantity_requested": -5
+   }
+
+2. Custom Field Validation
+
+```
+def validate_quantity_requested(self, value):
+    if value <= 0:
+        raise serializers.ValidationError(...)
+```
+
+3. Object-Level Validation
+   _def validate(self, data):_
+   ...
+   Used when validating multiple fields together.
+
+In this project,
+Examples:
+store_id must exist
+product_id must exist
+quantity_requested > 0
+
+#### Where does validation happen in DRF?
+
+Validation is usually performed inside serializers using built-in field validation, custom field validators, and object-level validation methods.
+
+## 3. APIView vs ViewSet
+
+**APIView**
+We manually define methods here
+Ex:
+
+```
+class OrderCreateView(APIView):
+    def post(self, request):
+    ...
+```
+
+We decide here:
+_get()_
+_post()_
+_put()_
+_delete()_
+ourselves
+
+Advantage: More control, Good for custom business logic
+In this project
+_POST /orders/_
+_GET /stores/<id>/orders_
+_GET /stores/<id>/inventory_
+were implemented with APIview most likely
+
+**ViewSet**
+DRF automatically provides common CRUD operations
+Ex:
+
+```
+class ProductViewSet(ModelViewSet):
+    queryset = Product.objects.all()
+```
+
+Automatically gives:
+_GET_
+_POST_
+_PUT_
+_PATCH_
+_DELETE_
+Less code.
+More convention-based
+
+**APIView**: More Control, More Code
+**ViewSet**: Less Code, More Automation
+
+#### Why did you use APIView instead of ViewSet?
+
+My APIs contained custom business logic such as inventory validation, order, confirmation, stock deduction, and custom search behaviour. APIView gave me more control over request handling and response generation.
+
+## 4. Authentication vs Permissions
+
+**Authentication**
+Authentication answers: Who are you?
+Ex:
+_Omkar logs in_
+System identfies
+_User = Omkar_
+
+Common DRF authentication methods:
+_SessionAuthentication_
+_TokenAuthentication_
+_JWT Authentication_
+
+**Permissions**
+Permissions answer: What are you allowed to do?
+Ex:
+User Identified
+Now Check:
+Can create orders?
+Can delete products?
+Can view inventory?
+
+**Ex:**
+Authentication: You're Omkar
+Permission: You're Allowed to enter the room
+
+## 5. Path Params vs Query Params vs Request Body
+
+**Path Parameters**
+Part of URL path
+Ex:
+_Get /stores/5/orders/_
+Here:
+_5_
+is a path parameter
+
+Purpose: Identify a specific resource
+
+**Query Parameters**
+Appear after:
+_?_
+Ex:
+_GET /api/search/products/?category=2&min_price=1000_
+
+Used for:
+
+- Filtering
+- Sorting
+- Searching
+- Pagination
+
+**Request Body**
+Data sent inside request
+Usually in:
+POST
+PUT
+PATCH
+
+Ex:
+_POST /orders/_
+Body:
+{
+"store_id": 1
+"items": [...]
+}
+
+Easy memory trick,
+Path params: Identify resource
+Query params: Filter resource
+Body: Create/Update resource
+
+#### Why is store_id in the path but cateory in query params?
+
+store_id identifies the resource being accessed, while category is used to filter search results. Resource identifiers belong in the path, while filters belong in query parameters.
+
+## 6. Pagination
+
+Imagine:
+1200 Products
+from the seed data
+
+**Without Pagination**:
+_GET /api/search/products/_
+returns:
+1200 products
+Huge response.
+Slow.
+Wasteful.
+
+**With Pagination**:
+Request:
+_GET /api/search/products/?page=1_
+Returns:
+
+```
+{
+  "count": 1200,
+  "next": "...",
+  "previous": null,
+  "results": [...]
+}
+```
+
+Only a subset is returned.
+
+**Benefits of using Pagination**
+
+1. Faster API
+   Less data transferred
+
+2. Less Memory
+   Backend uses less RAM
+
+3. Better UX
+   Frontend loads quickly
+
+#### Why does your search API need pagination?
+
+The product table contains many records. Pagination limits the number of results returned per request, improving response time, reducing bandwidth usage, and providing a better user experience.
+
+**Full Request Lifecycle in This Project**
+
+Suppose:
+_POST /orders/_
+
+Request:
+{
+"store_id": 1,
+"items": [...]
+}
+
+Flow:
+
+```
+URL
+ ↓
+APIView
+ ↓
+Serializer
+ ↓
+Validation
+ ↓
+Order Service Logic
+ ↓
+transaction.atomic()
+ ↓
+Database
+ ↓
+Serializer
+ ↓
+JSON Response
+```
+
+## Most Important Questions from this topic
+
+1. What does serializer do?
+   Converts Django objects to JSON and validates incoming JSON
+
+2. Where does DRF validation happen
+   Inside serializers through field validation and custom validation methods.
+
+3. APIView vs ViewSet?
+   APIView provides more control, while ViewSet automatically provides CRUD behavior.
+
+4. Difference between authentication and permission?
+   Authentication identifies the user. Permissions determine what actions they can perform.
+
+5. Path parameter vs query parameter?
+   Path parameters identify resources. Query parameter filters or modify how data is returned
+
+6. Why use pagination?
+   To reduce response size, improve performance, and handle large datasets efficiently.
+
+#### Quick Drill
+
+- why does DRF needs serializers?
+- where should business validation happen: view or serializer?
+- why might APIView be a better choice than ViewSet for you order API?
+- is _store_id_ in /stores/5/orders/ a path param or query param?
+- is ?category=1 a path param or a query param?
+- Why would returning 1200 products in one response be a bad idea?
+- What's the difference between authentication and permissions?
+
+---
+
+# Topic 3: Search & Autocomplete APIs
