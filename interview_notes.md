@@ -1386,3 +1386,249 @@ My application has six main tables: Category, Product, Store, Inventory, Order, 
 7. Why did you create an _OrderItem_ table instead of storing products directly inside Order?
 
 ---
+
+# Topic 4: Django Migrations
+
+This topic is asked in almost all Django interviews because migrations are how DJango keeps the python models and the database schema in sync
+
+## 1, What is Migration?
+
+A migration is a file that tells Django:
+_Here is what changed in my models. Update the database accordingly._
+
+**Example:**
+Initially:
+
+```
+class Product(models.Model):
+    title = models.CharField(max_length=256)
+```
+
+Later you add:
+
+```
+class Poduct(models.Model):
+    title = models.CharField(max_length=256)
+    price = models.DecimalField(...)
+```
+
+The Python code is changed now, because of the addition
+But PostgreSQL still has the old table.
+Django needs a way to update the database.
+That's what Migrations do.
+
+**Real-Life Analogy**
+Think of:
+_models.py_
+as a blueprint.
+And:
+_PostgreSQL_
+as the actual building.
+When the blueprint changes, we need construction instructions to update the building.
+Migration files are those instructions.
+
+#### What is migration?
+
+A migration is a version-controlled file that records database schema changes and allows Django to apply these changes to the database safely.
+
+## 2. makemigrations vs migrate
+
+This is probably the most asked migration question
+
+**Step 1**
+You modify mode
+
+```
+class Product(models.Model):
+    title = models.CharField(max_length=256)
+    price = models.DecimalField(...)
+```
+
+**Step 2**
+Run:
+
+```
+python manage.py makemigrations
+```
+
+Django compares:
+_Current Models vs Preview Migration State_
+and generate a migration file.
+Ex:
+_products/migrations/0002_add_price.py_
+
+**Important**
+At this point
+_Database NOT changed yet_
+Only a migration file is created.
+
+**Step 3**
+Run:
+
+```
+python manage.py migrate
+```
+
+Now Django executes SQL against PostgreSQK
+Database is updated
+
+EASY MEMORY TRICK
+makemigrations -> _Create migratiion files_
+migrate -> _Execute migration files_
+
+#### Difference between makemigrations and migrate>
+
+makemigrations create migration files based on model changes. migrate applies those migration files to the database and updates the schema
+
+## 3. What Do Migrations Files Actually Contain?
+
+Example migration:
+
+```
+class Migration(migrations.Migration):
+
+    dependencies = [
+      ("products","0001_initial),
+    ]
+
+    operations = [
+      migrations.AddField(
+         model_name="product",
+         name="price",
+         field=models.DecimalField(...)
+      )
+    ]
+```
+
+Django later converts this into SQL.
+
+Something like
+_ALTER TABLE product_
+_ADD COLUMN price NUMERIC;_
+
+**Key Idea**
+Migration files are Python instructions describing database changes.
+Not actual SQL
+Django generate SQL from them.
+
+Common Operations
+
+1. Create Table
+   migrations.CreateModel(...)
+
+2. Add column
+   migrations.AddField(...)
+
+3. Remove column
+   migrations.RemoveField(...)
+
+4. Create Index
+   migrations.AddIndex(...)
+
+5. Add constraint
+   migrations.AddConstraint(...)
+
+#### What is stored inside a migration file?
+
+Migration files contain Python operations that desribe schema changes such as creating tables, adding fields, removing fields, creating indexes, or adding constraints.
+
+## 4. Common Migration Mistakes
+
+**Mistake 1**
+Changing models but forgetting migrations
+Ex:
+_price = models.DecimalField(...)_
+But never running
+_python manage.py makemigrations_
+_python manage.py migrate_
+Result:
+Model and Database out of sync
+
+**Mistake 2**
+Deleting migration files manually
+Bad:
+_products/migrations_
+_0001_initial.py_
+_0002_add_price.py_
+(delete them)
+Now migration history becomes broken.
+
+**Mistake 3**
+Editing old migrations after deployment
+Suppose:
+_0001_initial.py_
+already exists in production.
+Never modify it.
+Create a new migration instead.
+
+**Mistake 4**
+Not commiting migration files on Git.
+Bad:
+git add model.py
+git commit
+but forgot
+migrations/
+Now teammates can't update their database.
+
+**Mistake 5**
+Merge conflicts in migrations
+Developer A:
+0005*add_price.py
+Developer B:
+0005_add_status.py
+Both create migration 0005
+Conflict happens.
+Need:
+\_python manage.py makemigrations*
+to generate a merge migration.
+
+#### What migration problems have you seen?
+
+Common issues include forgetting to run migrations, not committing migration files, deleting migration files manually, and migration conflicts when multiple developers modify models simultaneously
+
+## 5. Why Migratipns Matter in a Team
+
+Migrations provide a consistent and version-contolled way to manage database schema changes. They ensure developer and environment has the same database structure.
+
+#### Questions might ask base on prj
+
+1. How did you create your database tables?
+   I defined Django models and used migrations. Django generate migration files, and I applied them using _python manage.py migrate_ which created the PostgreSQL tables.
+
+2. What happens when you add a field to Product?
+   After updating the model, I run _makemigrations_ to generate a migration file and then _migrate_ to apply the schema changes to the database
+
+3. Why do migration files belong in Git?
+   Migration files describe database changes. If they are not committed, other developers cannot reproduce the same database schema.
+
+4. Can Django create SQL automatically?
+   Yes. Django migrations generate the appropriate SQL statements and execute them when we run _migrate_
+
+5. What is the difference between schema and data?
+   Schema refers to the database structure such as tables, columns, indexes, and constraints. Data refers to the actual records stored inside those tables.
+
+## Walk me through your Django Project
+
+I built a Django REST API for inventory and order management. The project is divided into apps such as products, stores, orders, and search. Django models define the database scehma, serializers handles JSON conversion and validation, views process requests, and URL routes map endpoints to views. I used PostgreSQL as the database, optimized queries using _select_related_ and _prefetch_related_, enforced data consistency through foreign keys and unique constraints, and managed schema changes using Django migrations. Order creation is wrapped in _transaction.atomic()_ to ensure inventory updates remain consistent
+
+#### Final Day-1 Quiz
+
+1. What is the difference between MVT and MVC?
+
+2. What is the role of serializers in DRF?
+
+3. What is an ORM and why is it useful?
+
+4. What is a QuerySet and what does "lazy evaluation" mean?
+
+5. Explain the N+1 query problem
+
+6. When would you use _select_related()_?
+
+7. Why did you use a unique constraint on _(store, product)_ in inventory?
+
+8. What is the difference between a primary key and a foreign key?
+
+9. What is the difference between _makemigrations_ and _migrate_?
+
+10. Why should migration files be committed to Git?
