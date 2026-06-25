@@ -2306,3 +2306,652 @@ JSON Response
 ---
 
 # Topic 3: Search & Autocomplete APIs
+
+This is an important topic as per interview point of view, cause mostly all junior backend devs can build CRUD APIs
+But:
+_Search_
+_Filtering_
+_Sorting_
+_Pagination_
+_Autocomplete_
+_Query Optimization_
+show backend engineering thinking
+
+## 1. How Does Keyword Search Work?
+
+Your endpoint:
+_GET /api/search/products/?q=iphone_
+The user enters:
+_iphone_
+and wants matching products.
+
+What Fields is used for Search in this project?
+
+- Product.title
+- Product.description
+- Category.name
+
+**Search achieved using Django ORM**
+Typically:
+
+```
+from django.db.models import Q
+
+products = Product.objects.filter(
+   Q(title__icontains=query) |
+   Q(description__icontains=query) |
+   Q(category__icontains=query)
+)
+```
+
+What is _icontains_?
+icontains are built in Django built-in field look up
+Ex:
+_title\_\_icontains="iphone"_
+Matches:
+_iPhone 15_
+_IPHONE 15_
+_Apple Iphone_
+_Used iPhone_
+Case-insensitive.
+
+Why use **Q** Objects?
+Without Q:
+_Product.objects.filter(title\_\_icontains=query)_
+searches only title.
+
+With **Q**:
+
+```
+Q(title...)
+|
+Q(description...)
+|
+Q(catgory...)
+```
+
+means:
+_Match ANY of these fields_
+
+#### How did you implement keyword search?
+
+I used Django ORM with Q objects and icontains lookups. The search check product titles, description and category name, allowing case-insensitive matching across multiple fields
+
+## 2. How Did You Implement Filters?
+
+Filters in this Project:
+_category_
+_min_price_
+_max_price_
+_store_id_
+_in_stock_
+
+1. **Category Filter**
+   Ex:
+   _GET /api/search/products/?category=2_
+   ORM:
+   _queryset = queryset.filter(category_id=2)_
+
+2. **Minimum Price**
+   Ex:
+   GET /api/search/products/?min*price=1000
+   ORM:
+   queryset = queryset.filter(price_gte=1000)
+   Meaning:
+   \_price >= 1000*
+
+3. **Maximum Price**
+   Ex:
+   GET /api/search/products/max_price=5000
+   ORM:
+   queryset =queryset.filter(price_lte=5000)
+
+4. **Price Range**
+   Ex:
+   GET /api/search/products/?min*price=1000&max_price=5000
+   Result:
+   \_1000 <= price <= 5000*
+
+5. **Store Filter**
+   Ex:
+   GET /api/search/products/?store*id=5
+   Now we only care about products available in :
+   \_Store #5*
+   Usually:
+   queyset = queryset.filter(inventory\_\_store_id=5)
+
+6. **In Stocke Filter**
+   Ex:
+   GET /api/search/products/?in*stock=true
+   ORM:
+   queryset = queryset.filter(inventory* _quantity_ \_gt=0)
+   MeaningL
+   _quantity > 0_
+
+#### How did you implement filters?
+
+After building the base queryset, I conditionally applied filters using query parameters. For example, category filters used category_id, price filters used gte and lte lookups, and stock filters checked inventory quantity.
+
+## 3. How Did Sorting Work?
+
+Sorting in this Project:
+_price_
+_-price_
+_newest_
+
+1. **Price Ascending**
+   Request:
+   _GET /api/search/products/?sort=price_
+   ORM:
+   _queryset.order_by("price")_
+   Result:
+   100
+   200
+   300
+   500
+
+2. **Price Descending**
+   Request:
+   _GET /api/search/products/?sort=-price_
+   ORM:
+   _queryset.order_by("-price")_
+   Result:
+   500
+   300
+   200
+   100
+
+3. **Newest Products**
+   Request:
+   _GET /api/search/products/?sort=newest_
+   Usually:
+   _queryset.order_by("-created_at")_
+
+#### How did you implement sorting?
+
+I used Django ORM's order_by method. Query parameters determine which field is used for ordering, such as price ascending, price descending, or newest products first.
+
+## 4. What About Relevance?
+
+Relevance shows the relevant apps, it is not used in this project. But it is achievable by Elasticsearch or PostgreSQL full-text search
+
+## 5. How Does Autocomplete work?
+
+Endpoint
+_GET /api/search/suggest/?q=iph_
+User types:
+_iph_
+Expected:
+iphone 15
+iphone 14
+iphone Charger
+
+Autocomplete is different from search:
+Search:
+_Find matching products_
+Autocomplete:
+_Suggest likely products while trying_
+
+**Prefix Matching**
+Best results start with:
+_iph_
+Example:
+iPhone
+iPhone 15
+iPhone Charger
+
+ORM:
+
+```
+Product.ojects.filter(
+   title__istartwith=query
+)
+```
+
+**General Matches**
+After prefix Matches:
+
+```
+Product.objects.filter(
+   title__icontains=query
+)
+```
+
+Then combine results
+
+#### How d0es autocomplete prioritize results?
+
+Prefix matches are returned before general contains matches because products starting with the entered texts are usually more usually more relevant to users
+
+## 6. Why Minimum 3 Characters?
+
+Minimum query length =3, in this project.
+Imagine:
+_GET /api/search/suggest/?q=i_
+"Potential matches:
+iPhone
+iPad
+Intel
+Mini Speaker
+Wireless"
+Huge number of results.
+
+Problems:
+Too many DB queries
+Poor relevance
+
+Better performance,
+By requiring:
+3+ characters
+results become more specific
+
+#### Why require 3 characters before autocomplete?
+
+It reduces unnecessary database queries, improve result quality, and prevents excessive load from extremely broad searches.
+
+## 7. Including Inventory Quantity When store_id is Provided
+
+Ex:
+_GET /api/search/products/?store_id=5_
+User wants:
+
+```
+{
+   "id": 1,
+   "title": "iPhone",
+   "quantity": 12
+}
+```
+
+**Why this question is Special?**
+Product table does NOT contain:
+_quantity_
+Inventory table does
+
+Need relationship:
+
+```
+Product
+    ↓
+Inventory
+    ↓
+Store
+```
+
+Example ORM:
+
+```
+queryset = Product.objects.filter(
+   inventory__store_id=5
+)
+```
+
+Then serializer accesses:
+
+```
+inventory.quantity
+```
+
+for that store.
+
+**Optimization**
+Without optimization:
+_N+1 queries_
+can occur
+
+Better:
+
+```
+Product.objects.prefetch_related(
+   "inventory_set"
+)
+```
+
+or custom Prefetch
+
+#### How did you include quantity in search results when store_id was provided>
+
+Quantity is stored in inventory table rather than Product. When a store_id is supplied, I join Product with Inventory using the ORM relationship and return the inventory for that specific store.
+
+## Questions from Topic 3
+
+1. How did you implement keyword search?
+   Using Django ORM Q objects and icontains lookups across title, description, and category name.
+
+2. How did you implement filters?
+   By conditionally applying ORM filters based on query parameters such as category, price range, store, and stock availability.
+
+3. How did you implement sorting
+   Using Django ORM's order_by method with fields like price and created_at
+
+4. Why require 3 characters before autocomplete?
+   To reduce unncesssary database load and improve suggestion relevance
+
+5. How are prefix matches prioritized?
+   Products whose titles start with the query are returned before general contains matches because they are typically more relevant
+
+6. How do you return inventory quantity in search results?
+   By joining products with inventory using the ORM relationship and retrieving quantity for the requested store.
+
+#### Mini Drill
+
+- Why use Q() objects instead of a simple filter?
+- What does icontains do?
+- How would you filter products between ₹1000 and ₹5000?
+- Why is autocomplete different from search?
+- Why require at least 3 characters?
+- Why is quantity stored in Inventory and not Product?
+- If your product table grows to 10 million rows, what would you improve about search?
+
+---
+
+# Topic 4: Swagger & OpenAPI with drf-spectacular
+
+This topic is extemely important cause, there are
+/api/docs/
+/api/schema/
+drf-spectacular
+
+Far fewer candidates can explain:
+
+- API documentation
+- OpenAPI
+- Swagger
+- Auto-generated schemas
+
+## 1. What is OpenAPI
+
+OpenAPI is a standard format for describing APIs
+Think of it as:
+_A machine-readable contract for your APIs_
+It describes:
+Endpoints
+HTTP methods
+Request parameters
+Request body
+Response body
+Status codes
+Authentication
+
+Ex,
+The endpoint:
+_POST /orders/_
+OpenAPI describes:
+
+```
+POST /orders:
+  requestBody:
+    store_id
+    items
+
+   response:
+     201:
+       Order created
+
+     422:
+       Inventory Insufficient
+```
+
+**Why Does it Exist?**
+Imagine you're a frontend developer.
+Without documentation:
+_What endpoint exists_
+_What request body is needed?_
+_What does the response look like_
+You must ask backend developers constantly
+
+With OpenAPI:
+_Everything is documented automatically._
+
+**In this project**
+OpenAPI decribes:
+_POST /orders/_
+_GET /stores/{store_id}/orders/_
+_GET /stores/{store_id}/inventory/_
+_GET /api/search/products/_
+_GET /api/search/suggest/_
+including their parameters and responses
+
+#### What is OpenAPI?
+
+OpenAPI is standard sepecification for describing REST APIs. It defines endpoints, parameters, request bodies, responses, authentication, and other API details in a machine-readable format.
+
+## 2. What is Swagger UI?
+
+Swagger UI is:
+_A visual interface built from a OpenAPI schema_
+
+Think of OpenAPI as:
+_Blueprint_
+Swagger UI as:
+_Interactive website_
+
+Ex,
+OpenAPI schema:
+_GET /api/search/products_
+Swagger UI turns it into:
+
+```
+[ Search Products ]
+
+q: __________
+category: ________
+min_price: ________
+
+[ Try it Out ]
+```
+
+We can even execute API request directly fromt the browser.
+
+In this Project
+Swagger UI:
+_/api/docs/_
+lets user:
+_View endpoints_
+_See request examples_
+_See response examples_
+_Test APIs_
+
+#### Difference between OpenAPI and Swagger UI?
+
+OpenAPI is the specification that describes the API. Swagger UI is a graphical interface that reads the OpenAPI schema and displays interactive documentaion.
+
+## 3. How Does drf-spectacular Generate Documentation?
+
+DRF spectacular is a popular, highly customizable third party library for the Django REST framework. It automatically generates OpenAPI 3.0 schemas from your existing DRF codebase, which are then used to build interactive documentation like Swagger UI
+
+```
+class ProductSearchView(APIView):
+    def get(self, request):
+    ...
+```
+
+drf-spectacular inspects:
+_Views_
+_Serializers_
+_URLs_
+_Permissions_
+and generated:
+_OpenAPI Schema_
+automatically
+
+Ex,
+Serializer:
+_class ProductSerializer(ModelSerializer):_
+_..._
+drf-spectaular can infer:
+Product:
+id
+title
+price
+category
+it then includes that in the generated docs.
+
+In This Project
+drf-spectacular automatically discovers:
+_POST /orders/_
+_GET /stores/{id}/orders/_
+_GET /stores/{id}/invetory/_
+_GET /api/search/products/_
+_GET /api/search/suggest/_
+and builds documentation.
+
+#### How does drf-spectacular generate docs automatically?
+
+def-spectacular inspects Django REST Framework views, serializers, URLs, and settings to generate an OpenAPI schema automatically.
+
+## 4. Difference Between/api/schema/ and /api/docs/
+
+**/ap/schema/**
+Retuens:
+_Raw OpenAPI schema_
+Usually JSON or YAML
+Ex:
+
+```
+{
+  "openapi": "3.0.0",
+  "paths": {
+    ...
+  }
+}
+```
+
+Used by:
+_Swagger UI_
+_Code generators_
+_Frontend tools_
+_Testing tools_
+
+**/api/docs/**
+Returns:
+_Human-friendly Swagger UI_
+A webpage
+
+**THinks:**
+
+```
+/api/schema/
+      ↓
+Raw Data
+
+/api/docs/
+      ↓
+Visual Interface
+```
+
+#### what is the difference between /api/schema/ and /api/docs/?
+
+/api/schema/ returns the raw OpenAPI specification, while /api/docs/ renders a Swagger UI interface using that schema for interactive documentation.
+
+## 5. What is @extend_schema?
+
+This is where it moves from:
+_Basic Docs_
+to
+_Professional Docs_
+
+Without it:
+drf-spectacular guesses
+Sometimes it guesses incorrectly or misses details.
+Ex:
+
+```
+from drf_spectacular.utils import extend_schema
+
+@extend_schema(
+    summary="Create Order",
+    description="Creates an order after validating inventory.",
+)
+class OrderCreateView(APIView):
+    ...
+```
+
+Now Swagger shows:
+_Create Order_
+Creates an order after vaildating inventory.
+Much better.
+
+**Document Query Parameters**
+Search endpoint:
+_GET /api/search/products/_
+
+Without documentation:
+_What query params exist?_
+Unknown.
+
+With:
+
+```
+@extend_schema(
+    parameters=[
+        OpenApiParameter("q"),
+        OpenApiParameter("category"),
+        OpenApiParameter("min_price"),
+        OpenApiParameter("max_price"),
+    ]
+)
+```
+
+Swagger shows them explicitly
+
+**Document Responses**
+Ex:
+
+```
+@extend_schema(
+    responses={
+        200: ProductSerializer,
+        400: ErrorSerializer,
+    }
+)
+```
+
+Now consumers know exactly what responses look like
+
+#### Why use @extend_schema?
+
+@extend_schema allows me to provide additional documentation such as descriptions, parameters, request examples and response schemas when automatic generation is not sufficient.
+
+**How Swagger Fits into THis Project**
+
+```
+Django Views
+      ↓
+Serializers
+      ↓
+drf-spectacular
+      ↓
+OpenAPI Schema
+      ↓
+Swagger UI
+```
+
+## Most imp questions from Topic 4
+
+1. What is OpenAPI?
+   A standad specification for describing REST APIs in a machine-readable format
+
+2. What is Swagger UI?
+   An interactive web interface that displays API documentation generated from an OpenAPI schema
+
+3. How does drf-spectacular work?
+   It inspects DRF views, serializers, URLs, and settings to generate OpenAPI schema automatically
+
+4. Difference between /api/schema/ and /api/docs?
+
+5. Why use @extend_schema?
+   to add richer documentation such as summaries, descriptions, parameters, examples and response definitions
+
+## Day 2 Quiz
+
+1. Why is GET /api/search/products/ a GET request and not a POST request?
+2. WHat is the difference between a safe method and an idempotent method?
+3. What status code would you return for a successfully created order?
+4. What is the difference between a serializer and a model?
+5. Why did you choose APIView instead of ViewSet for you order API?
+6. What is the difference between path parameters, query parameters, and request body data?
+7. How did you search API perform keyword matching?
+8. Why require a minimum of 3 characters for autocomplete?
+9. What is the difference between OpenAPI and Swagger UI?
+10. What is the difference between /api/schema/ and /api/docs/
