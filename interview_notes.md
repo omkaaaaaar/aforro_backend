@@ -2955,3 +2955,363 @@ Swagger UI
 8. Why require a minimum of 3 characters for autocomplete?
 9. What is the difference between OpenAPI and Swagger UI?
 10. What is the difference between /api/schema/ and /api/docs/
+
+---
+
+---
+
+# Day 3
+
+# Topic 1: Transactions, ACID, Atomicity
+
+## 1. ACID Properties
+
+ACID Properties ensure database transactions are reliable.
+
+**A - Atomicity**
+Either everything succeeds or everything fails
+Real world Ex:
+ATM withdrawal:
+_Money deducted + Cash dispensed_
+Both should happen
+Not:
+_Money deducted and Cash not dispensed_
+In this project,
+Order Creation:
+_Create Order_
+_Create OrderItems_
+_Reduce Inventory_
+Either all succeed:
+
+- Order created
+- Inventory Reduced
+  or everything rolls back.
+
+**C - Consistency**
+Database rules must remain valid before and after a transaction.
+Ex:
+Inventory:
+_Stock = 5_
+After Selling 2:
+_Stock = 3_
+Valid.
+Not:
+_Stock = -5_
+Invalid.
+Consistency ensures business rules stay correct
+
+**I - Isolation**
+Multiple transaction should not interfere with each other.
+Ex:
+Two users buying the last item.
+Each transaction should behave safely.
+In this project
+Two customers ordering the last iPhone simultaneously
+One should succeed.
+The other should fail.
+Not both succeed.
+
+**D - Durability**
+Once committed, data stays saved.
+Ex:
+Order confirmed.
+Server crashes 1 second later.
+Order should still exist in PostgreSQL
+
+#### What are ACID Properties?
+
+ACID stands for Atomicity, Consistency, Isolation and Durability. They ensure database transactions are reliable, consistent, and safe even when failure occur.
+
+## 2. What Does transaction.atomic()Do?
+
+Django:
+
+```
+from django.db import transaction
+
+with transaction.atomic():
+    ...
+```
+
+creates a database transaction
+
+Meaning
+Everything inside becomes:
+_One unit of work_
+
+In this project
+Order flow:
+Validate Inventory
+Create Order
+Create OrderItem
+Reduce Inventory
+
+Without atomic():
+Create Order ✓
+Create OrderItems ✓
+Inventory Update ❌
+Result:
+Order exists
+Inventory incorrect
+Database inconsistency.
+
+With atomic():
+Create Order ✓
+Create OrderItems ✓
+Inventory Update ❌
+Django rolls back everything
+Result:
+No Order
+No OrderItems
+No Inventory Changes
+Safe.
+
+#### Why did you use transaction.atomic()?
+
+Order creation invokes multiple database operations. transaction.atomic() ensures that eiter all operations succeed or all are rolled back, preventing incosistent inventory and order data.
+
+## 3. What is a Race Condtition?
+
+A race condition happens when:
+Two operations
+Try to modify
+The same data
+At the same time
+
+**Ex:**
+Inventory:
+_1 iPhone left_
+Customer A checks Inventory:
+_Stock = 1_
+Customer B checks Inventory:
+_Stock = 1_
+Both think:
+_Available_
+Both buy.
+Problem.
+
+#### What is race condition?
+
+A race condition occurs when multiple requests access and modify the same data simultaneously, causing unexpected or incorrect results.
+
+## 4. What is Overselling?
+
+Overselling means:
+_Selling more stock Than actually exists_
+Ex:
+_Inventory = 1_
+Two customers buy simultaneously.
+Both orders succeed.
+Now:
+_Sold = 2_
+_Available = 1_
+Impossible.
+
+**How does Your API Prevent it?**
+In this project we already have:
+_transaction.atomic()_
+which helps.
+
+**Better Production Solution**
+Interviewers may ask:
+_Is atomic() alone enough?_
+Not always. In production I would use row-level locking with select*inventory_update() to prevent inventory updates
+Ex:
+\_Inventory.objects.select_for_update()*
+Locks the inventory row.
+Only one trasaction can modify at a time.
+
+#### What happens if two orders for the last item arrive simultaneously?
+
+Without proper locking, both requests could read the same stock and oversell inventory. In production I would combine transaction.atomic() with select_for_update() to ensure only one transaction can update inventory at a time.
+
+## 5. Same order sent twice
+
+Ex:
+_POST /orders/_
+sent twice accidentlly.
+
+Without protection:
+_Order #101_
+_Order #102_
+Duplicate order.
+
+Prouction systems often use:
+_Idempotency Key_
+Ex:
+_X-Idempotency-Key: abc123_
+Server remembers:
+_abc123 already processed_
+Returns original result.
+No duplicate order.
+
+#### Why is idempotency important for payments?
+
+Payment requests may be retired because of network issues. Idempotency prevents duplicate charges and duplicate orders when the same request is received more than once.
+
+## 6. Why Store Money as Integers?
+
+Bad:
+_price = 10.99_
+store as float
+
+Prblem:
+Computers cannot represent many decimal values exactly.
+
+Ex:
+_print(0.1 + 0.2)_
+Output:
+_0.300000000004_
+Not:
+_0.3_
+This is a real bug.
+
+Imagine:
+_Millions of transactions_
+Tiny errors accumulate.
+
+**Better Approach**
+Store:
+_₹10.99_
+as:
+_1099 paise_
+integer.
+
+Calcualtion becomes:
+_1099 + 499_
+Exact.
+No rounding errors
+
+In this project
+I have used:
+_DecimalField_
+which is good
+Even better than float
+
+#### Why shouldn't money be stored as float?
+
+Floats can introduce precision errors because decimal values cannot always be resprsented exactly in binar. Financial systems usually use Decimal types of store values as integers such as paise to avoid rounding issues
+
+---
+
+# Topic 2: Webhooks and Protocols
+
+## 1. What is a Webhook?
+
+One system automatically sending to another system when an event happens.
+A webhook is an HTTP callback where one system automatically sends data to another system when a specific event occurs.
+Think:
+_Normal API_
+_You ask for info_
+_Webhook:_
+_Someone sends you info automatically_
+
+## 2. Normal API call vs Webhook
+
+**Normal API**
+
+```
+Your Backend
+      ↓
+Requests Data
+      ↓
+Other Service
+```
+
+**Webhook**
+
+```
+Other Service
+      ↓
+Sends Data Automatically
+      ↓
+Your Backend
+```
+
+#### What happends if your server is down when a webhook arrives?
+
+Mose webhook providers retry delivery several times until they recieve a successful response such as HTTP 200
+
+```
+Customer Places Order
+       ↓
+Payment Gateway
+       ↓
+Payment Success
+       ↓
+Webhook Sent
+       ↓
+Your Django API
+```
+
+## HTTP vs HTTPS
+
+HTTP
+hypertext transfer protocol
+
+HTTPS
+Data is encrypted before transmission
+
+## Client - Server Communication
+
+**Client**
+Requests data.
+Ex:
+Browser
+Mobile App
+Frontend
+Postman
+
+**Server**
+Processes request
+Ex:
+Django API
+Node API
+Spring Boot API
+
+#### Request-Response Cycle
+
+Receives Request
+↓
+Runs Validation
+↓
+Checks Inventory
+↓
+Creates Order
+↓
+Returns Response
+===
+
+## What is Logging?
+
+Recording important events that happen in your application.
+
+**Why does is matter?**
+Suppose a customer says:
+"My order disappeared"
+Without logs:
+No idea what happened
+With logs:
+Order request received
+Inventory checked
+Order created
+Celery task triggered
+
+## Environmental Variables
+
+Enivronmental variables store configuration outside your code.
+**Bad Practice**
+SECRET_KEY = "my-secret-key"
+DB_PASSWORD = "postgres123"
+Now secrets are
+Inside Github
+Inside source code
+Very dangerous
+
+Better:
+
+```
+import os
+
+SECRET_KEY = os.getenv("SECRET_KEY")
+```
